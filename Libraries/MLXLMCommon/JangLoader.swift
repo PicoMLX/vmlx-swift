@@ -1663,8 +1663,12 @@ public struct JangLoader: Sendable {
     /// The temp-directory shims behind a resolved tokenizer directory: the
     /// directory itself when it is one, plus any shim its symlinks point into
     /// (a tokenizer-class shim links to the chat-template shim it was built
-    /// from). Empty for an ordinary model or tokenizer directory, so a caller
-    /// may delete every returned URL once the tokenizer is no longer needed.
+    /// from). Empty for an ordinary model or tokenizer directory.
+    ///
+    /// The library does not delete them: a model's configuration names the
+    /// shim as its tokenizer source, so a configuration kept and loaded again
+    /// needs it. A caller that knows it will not reload a configuration may
+    /// delete every returned URL once it has released the model.
     public static func temporaryShimDirectories(
         behind tokenizerDirectory: URL,
         fileManager: FileManager = .default
