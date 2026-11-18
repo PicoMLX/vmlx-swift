@@ -6212,6 +6212,14 @@ public struct GenerateCompletionInfo: Sendable {
     /// reason remains cancelled for source compatibility with older consumers.
     public let generationFailure: GenerationFailure?
 
+    /// The stop token that ended this generation, when ``stopReason`` is
+    /// `.stop` because the model sampled an EOS/stop token. The token is not
+    /// among the yielded tokens and is not counted in
+    /// ``generationTokenCount``. `nil` for every other ending (length,
+    /// cancellation, early finish, text stop strings) and for producers that
+    /// do not report it.
+    public let stopTokenID: Int?
+
     /// The number of tokens processed per second during the prompt phase.
     ///
     /// Zero when the phase did not measurably run. `promptTime` is legitimately
@@ -6245,7 +6253,8 @@ public struct GenerateCompletionInfo: Sendable {
         nativeMTPStats: NativeMTPGenerationStats? = nil,
         dflash2Stats: DFlash2GenerationStats? = nil,
         toolCallProtocolFailure: ToolCallProtocolFailure? = nil,
-        generationFailure: GenerationFailure? = nil
+        generationFailure: GenerationFailure? = nil,
+        stopTokenID: Int? = nil
     ) {
         self.promptTokenCount = promptTokenCount
         self.generationTokenCount = generationTokenCount
@@ -6259,6 +6268,7 @@ public struct GenerateCompletionInfo: Sendable {
         self.nativeMTPStats = nativeMTPStats
         self.dflash2Stats = dflash2Stats
         self.generationFailure = generationFailure
+        self.stopTokenID = stopTokenID
     }
 
     public func summary() -> String {
