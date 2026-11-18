@@ -1653,6 +1653,48 @@ public struct JangLoader: Sendable {
         "TikTokenTokenizer": "Qwen2Tokenizer",
     ]
 
+    /// Name prefixes of the temp-directory shims written by
+    /// ``resolveChatTemplateSidecarSubstitution(for:fileManager:)`` and
+    /// ``resolveTokenizerClassSubstitution(for:overrideClass:fileManager:)``.
+    static let temporaryShimDirectoryPrefixes = [
+        "vmlx-tokenizer-shim-", "vmlx-chat-template-shim-",
+    ]
+
+    /// The temp-directory shims behind a resolved tokenizer directory: the
+    /// directory itself when it is one, plus any shim its symlinks point into
+    /// (a tokenizer-class shim links to the chat-template shim it was built
+    /// from). Empty for an ordinary model or tokenizer directory.
+    ///
+    /// The library does not delete them: a model's configuration names the
+    /// shim as its tokenizer source, so a configuration kept and loaded again
+    /// needs it. A caller that knows it will not reload a configuration may
+    /// delete every returned URL once it has released the model.
+    public static func temporaryShimDirectories(
+        behind tokenizerDirectory: URL,
+        fileManager: FileManager = .default
+    ) -> [URL] {
+        let tempRoot = fileManager.temporaryDirectory.resolvingSymlinksInPath().path
+        func isShim(_ url: URL) -> Bool {
+            temporaryShimDirectoryPrefixes.contains { url.lastPathComponent.hasPrefix($0) }
+                && url.deletingLastPathComponent().resolvingSymlinksInPath().path == tempRoot
+        }
+        guard isShim(tokenizerDirectory) else { return [] }
+        var shims = [tokenizerDirectory]
+        let entries =
+            (try? fileManager.contentsOfDirectory(
+                at: tokenizerDirectory, includingPropertiesForKeys: nil)) ?? []
+        for entry in entries {
+            guard let target = try? fileManager.destinationOfSymbolicLink(atPath: entry.path)
+            else { continue }
+            let parent = URL(fileURLWithPath: target, relativeTo: tokenizerDirectory)
+                .standardizedFileURL.deletingLastPathComponent()
+            if isShim(parent), !shims.contains(where: { $0.path == parent.path }) {
+                shims.append(parent)
+            }
+        }
+        return shims
+    }
+
     /// Like `resolveTokenizerDirectory(for:)` but also fixes
     /// `tokenizer_class` in `tokenizer_config.json` to an entry that
     /// swift-transformers 0.1.21 knows. If the class is already known,

@@ -1116,7 +1116,8 @@ public actor BatchEngine {
                         turboQuantCacheTransition: info.turboQuantCacheTransition,
                         unclosedReasoning: unclosed,
                         toolCallProtocolFailure: toolCallProcessor?.toolCallProtocolFailure,
-                        generationFailure: info.generationFailure)
+                        generationFailure: info.generationFailure,
+                        stopTokenID: stopMatched ? nil : info.stopTokenID)
                     terminationState.markCompleted()
                     if ProcessInfo.processInfo.environment["VMLX_CACHE_FETCH_TRACE"] == "1" {
                         // Hosts report the visible answer finishing seconds
@@ -3018,7 +3019,7 @@ public actor BatchEngine {
 
         // Check EOS on first generated token before yielding
         if stopTokenIDs.contains(tokenID) {
-            finishSlot(&slot, reason: .stop)
+            finishSlot(&slot, reason: .stop, stopTokenID: tokenID)
             slot.isFinished = true
         } else {
             slot.continuation.yield(.token(tokenID))
@@ -3148,7 +3149,7 @@ public actor BatchEngine {
 
         // Stop conditions (same rules as uncompiled path).
         if stopTokenIDs.contains(tokenID) {
-            finishSlot(&slot, reason: .stop)
+            finishSlot(&slot, reason: .stop, stopTokenID: tokenID)
             slot.isFinished = true
         } else {
             slot.continuation.yield(.token(tokenID))
@@ -3549,7 +3550,7 @@ public actor BatchEngine {
             // Check stop conditions BEFORE yielding — don't emit EOS tokens to callers.
             // This matches TokenIterator behavior where the stop token is never surfaced.
             if stopTokenIDs.contains(tokenID) {
-                finishSlot(&slot, reason: .stop)
+                finishSlot(&slot, reason: .stop, stopTokenID: tokenID)
                 slot.isFinished = true
             } else {
                 slot.continuation.yield(.token(tokenID))
@@ -3653,7 +3654,8 @@ public actor BatchEngine {
     /// future cache reuse.
     private func finishSlot(
         _ liveSlot: inout BatchSlot, reason: GenerateStopReason,
-        generationFailure: GenerationFailure? = nil
+        generationFailure: GenerationFailure? = nil,
+        stopTokenID: Int? = nil
     ) {
         var slot = liveSlot
         var generationFailure = generationFailure
@@ -3688,7 +3690,8 @@ public actor BatchEngine {
             promptTime: prefillTime,
             generationTime: decodeTime,
             stopReason: reason,
-            generationFailure: generationFailure
+            generationFailure: generationFailure,
+            stopTokenID: stopTokenID
         )
 
         // Surface completion before the cache store. The store may include a
