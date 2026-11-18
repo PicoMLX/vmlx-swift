@@ -506,7 +506,23 @@ public final class ModelContainer: Sendable {
     /// readable without entering the container.
     public let recommendedPrefillStepSize: Int?
 
+    /// Temp-directory tokenizer shims the load wrote for this model (see
+    /// ``JangLoader/temporaryShimDirectories(behind:fileManager:)``). The
+    /// tokenizer is fully in memory after load, so they are removed when the
+    /// container is released instead of being left for the OS to sweep.
+    private let temporaryTokenizerShims: [URL]
+
+    deinit {
+        for shim in temporaryTokenizerShims {
+            try? FileManager.default.removeItem(at: shim)
+        }
+    }
+
     public init(context: consuming ModelContext) {
+        self.temporaryTokenizerShims =
+            (try? context.configuration.tokenizerDirectory).map {
+                JangLoader.temporaryShimDirectories(behind: $0)
+            } ?? []
         self.recommendedPrefillStepSize = context.model.recommendedPrefillStepSize
         let cachePolicies = [
             context.model.cacheStorageDTypeIdentity,
