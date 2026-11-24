@@ -1,0 +1,32 @@
+name: Pico engine integration
+
+on:
+  pull_request:
+    branches: [engine-router]
+  push:
+    branches: [engine-router]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-contracts:
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Verify Metal toolchain
+        run: xcrun -sdk macosx metal -v
+      - name: Build and test tokenizer and completion contracts
+        run: |
+          xcodebuild test -scheme mlx-swift-Package \
+            -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath "$RUNNER_TEMP/vmlx-build" \
+            -skipMacroValidation -skipPackagePluginValidation \
+            -only-testing:MLXLMTests/PicoTokenizerLifetimeTests \
+            -only-testing:MLXLMTests/TokenizerClassSubstitutionTests \
+            -only-testing:MLXLMCommonFocusedTests/JangSamplingDefaultsTests \
+            -only-testing:MLXLMCommonFocusedTests/FinalFlushStopReasonTests
